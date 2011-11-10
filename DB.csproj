@@ -39,6 +39,7 @@
   </Target>
   -->
   <ItemGroup>
+    <Compile Include="Handle.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Type.cs" />
   </ItemGroup>

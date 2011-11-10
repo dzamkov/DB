@@ -40,6 +40,7 @@ namespace DB
         public static readonly PrimitiveType Double = PrimitiveType.Double;
         public static readonly ListType String = Type.Char.List;
         public static readonly VariantType Bool = Type.Variant("bool", new Option[] { new Option("false", Type.Void), new Option("true", Type.Void) });
+        public static readonly ListType Data = Type.Byte.List;
 
         /// <summary>
         /// Constructs a tuple type with elements of the given types.
