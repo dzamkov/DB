@@ -27,20 +27,84 @@ namespace DB
         /// </summary>
         public readonly Kind Kind;
 
-        public static readonly PrimitiveType Void = PrimitiveType.Void;
-        public static readonly PrimitiveType Byte = PrimitiveType.Byte;
-        public static readonly PrimitiveType Char = PrimitiveType.Char;
-        public static readonly PrimitiveType Short = PrimitiveType.Short;
-        public static readonly PrimitiveType UShort = PrimitiveType.UShort;
-        public static readonly PrimitiveType Int = PrimitiveType.Int;
-        public static readonly PrimitiveType UInt = PrimitiveType.UInt;
-        public static readonly PrimitiveType Long = PrimitiveType.Long;
-        public static readonly PrimitiveType ULong = PrimitiveType.ULong;
-        public static readonly PrimitiveType Float = PrimitiveType.Float;
-        public static readonly PrimitiveType Double = PrimitiveType.Double;
+        /// <summary>
+        /// A primitive type with only one value, and no data.
+        /// </summary>
+        public static readonly PrimitiveType Void = new PrimitiveType("void", 0, false);
+
+        /// <summary>
+        /// The primitive type for an unsigned byte of data.
+        /// </summary>
+        public static readonly PrimitiveType Byte = new PrimitiveType("byte", 1, false);
+
+        /// <summary>
+        /// The primitive type for a character.
+        /// </summary>
+        public static readonly PrimitiveType Char = new PrimitiveType("char", 2, false);
+
+        /// <summary>
+        /// The primitive type for a signed 2-byte integer.
+        /// </summary>
+        public static readonly PrimitiveType Short = new PrimitiveType("short", 2, true);
+
+        /// <summary>
+        /// The primitive type for an unsigned 2-byte integer.
+        /// </summary>
+        public static readonly PrimitiveType UShort = new PrimitiveType("ushort", 2, false);
+
+        /// <summary>
+        /// The primitive type for a signed 4-byte integer.
+        /// </summary>
+        public static readonly PrimitiveType Int = new PrimitiveType("int", 4, true);
+
+        /// <summary>
+        /// The primitive type for a unsigned 4-byte integer.
+        /// </summary>
+        public static readonly PrimitiveType UInt = new PrimitiveType("uint", 4, false);
+
+        /// <summary>
+        /// The primitive type for a signed 8-byte integer.
+        /// </summary>
+        public static readonly PrimitiveType Long = new PrimitiveType("long", 8, true);
+
+        /// <summary>
+        /// The primitive type for an unsigned 8-byte integer.
+        /// </summary>
+        public static readonly PrimitiveType ULong = new PrimitiveType("ulong", 8, false);
+
+        /// <summary>
+        /// The primitive type for a single-precision floating point number.
+        /// </summary>
+        public static readonly PrimitiveType Float = new PrimitiveType("float", 4, true);
+
+        /// <summary>
+        /// The primitive type for a double-precision floating point number.
+        /// </summary>
+        public static readonly PrimitiveType Double = new PrimitiveType("double", 8, true);
+
+        /// <summary>
+        /// The type for a string of character.
+        /// </summary>
         public static readonly ListType String = Type.Char.List;
-        public static readonly VariantType Bool = Type.Variant("bool", new Option[] { new Option("false", Type.Void), new Option("true", Type.Void) });
+
+        /// <summary>
+        /// The type for a boolean value.
+        /// </summary>
+        public static readonly VariantType Bool = Type.Variant("bool", new Option[] 
+        { 
+            new Option("false", Type.Void), 
+            new Option("true", Type.Void) 
+        });
+
+        /// <summary>
+        /// The type for arbitrary data.
+        /// </summary>
         public static readonly ListType Data = Type.Byte.List;
+
+        /// <summary>
+        /// The type for a dynamic value with an indefinite type.
+        /// </summary>
+        public static readonly DynamicType Dynamic = new DynamicType();
 
         /// <summary>
         /// Constructs a tuple type with elements of the given types.
@@ -116,6 +180,7 @@ namespace DB
     public enum Kind
     {
         Primitive,
+        Dynamic,
         Tuple,
         Struct,
         Variant,
@@ -129,7 +194,7 @@ namespace DB
     /// </summary>
     public sealed class PrimitiveType : Type
     {
-        private PrimitiveType(string Name, int Size, bool Signed)
+        internal PrimitiveType(string Name, int Size, bool Signed)
             : base(Name, Kind.Primitive)
         {
             this.Signed = Signed;
@@ -145,18 +210,18 @@ namespace DB
         /// Indicates wether this primitive type allows for negative values.
         /// </summary>
         public readonly bool Signed;
+    }
 
-        public static readonly new PrimitiveType Void = new PrimitiveType("void", 0, false);
-        public static readonly new PrimitiveType Byte = new PrimitiveType("byte", 1, false);
-        public static readonly new PrimitiveType Char = new PrimitiveType("char", 2, false);
-        public static readonly new PrimitiveType Short = new PrimitiveType("short", 2, true);
-        public static readonly new PrimitiveType UShort = new PrimitiveType("ushort", 2, false);
-        public static readonly new PrimitiveType Int = new PrimitiveType("int", 4, true);
-        public static readonly new PrimitiveType UInt = new PrimitiveType("uint", 4, false);
-        public static readonly new PrimitiveType Long = new PrimitiveType("long", 8, true);
-        public static readonly new PrimitiveType ULong = new PrimitiveType("ulong", 8, false);
-        public static readonly new PrimitiveType Float = new PrimitiveType("float", 4, true);
-        public static readonly new PrimitiveType Double = new PrimitiveType("double", 8, true);
+    /// <summary>
+    /// A type that stores a value of an indefinite type.
+    /// </summary>
+    public sealed class DynamicType : Type
+    {
+        internal DynamicType()
+            : base("dynamic", Kind.Dynamic)
+        {
+
+        }
     }
 
     /// <summary>
