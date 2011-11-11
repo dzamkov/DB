@@ -6,6 +6,21 @@ using System.Text;
 namespace DB
 {
     /// <summary>
+    /// Identifies a possible kind for a type.
+    /// </summary>
+    public enum Kind
+    {
+        Primitive,
+        Dynamic,
+        Tuple,
+        Struct,
+        Variant,
+        List,
+        Set,
+        Reference
+    }
+
+    /// <summary>
     /// Identifies and describes the type of a database object. Note that types are compared by reference; two types that have the same members
     /// and definition will not be considered equivalent unless they have the same reference.
     /// </summary>
@@ -13,19 +28,54 @@ namespace DB
     {
         internal Type(string Name, Kind Kind)
         {
-            this.Name = Name;
-            this.Kind = Kind;
+            this._Name = Name;
+            this._Kind = Kind;
+        }
+
+        internal Type(Kind Kind)
+        {
+            this._Kind = Kind;
         }
 
         /// <summary>
-        /// The user-friendly name of this type.
+        /// Gets the user-friendly name of this type.
         /// </summary>
-        public readonly string Name;
+        public string Name
+        {
+            get
+            {
+                if (this._Name == null)
+                {
+                    TupleType tt = this as TupleType;
+                    if (tt != null)
+                        return this._Name = TupleType.GetName(tt.ElementTypes);
+
+                    ListType lt = this as ListType;
+                    if (lt != null)
+                        return this._Name = ListType.GetName(lt.ElementType);
+
+                    SetType st = this as SetType;
+                    if (st != null)
+                        return this._Name = SetType.GetName(st.ElementType);
+
+                    ReferenceType rt = this as ReferenceType;
+                    if (rt != null && rt._TargetType != null)
+                        return this._Name = ReferenceType.GetName(rt.TargetType);
+                }
+                return this._Name;
+            }
+        }
 
         /// <summary>
-        /// The kind of this type.
+        /// Gets the kind of this type.
         /// </summary>
-        public readonly Kind Kind;
+        public Kind Kind
+        {
+            get
+            {
+                return this._Kind;
+            }
+        }
 
         /// <summary>
         /// A primitive type with only one value, and no data.
@@ -83,6 +133,11 @@ namespace DB
         public static readonly PrimitiveType Double = new PrimitiveType("double", 8, true);
 
         /// <summary>
+        /// The primitive type for a decimal number.
+        /// </summary>
+        public static readonly PrimitiveType Decimal = new PrimitiveType("decimal", 16, true);
+
+        /// <summary>
         /// The type for a string of character.
         /// </summary>
         public static readonly ListType String = Type.Char.List;
@@ -131,6 +186,18 @@ namespace DB
         }
 
         /// <summary>
+        /// Constructs a struct type that has a reference to itself by calling the given function with a reference type to the type it returns. Some operations
+        /// (such as .Name) may not be used withint he Construct function.
+        /// </summary>
+        public static StructType Fix(Func<ReferenceType, StructType> Construct)
+        {
+            ReferenceType rt = new ReferenceType();
+            StructType t = Construct(rt);
+            rt._TargetType = t;
+            return t;
+        }
+
+        /// <summary>
         /// Gets the type for a list of elements of this type.
         /// </summary>
         public ListType List
@@ -169,24 +236,19 @@ namespace DB
             }
         }
 
+        /// <summary>
+        /// Creates a handle to the default value of this type.
+        /// </summary>
+        public virtual Handle Default()
+        {
+            return null;
+        }
+
+        private string _Name;
+        private Kind _Kind;
         private ListType _List;
         private SetType _Set;
         private ReferenceType _Reference;
-    }
-
-    /// <summary>
-    /// Identifies a possible kind for a type.
-    /// </summary>
-    public enum Kind
-    {
-        Primitive,
-        Dynamic,
-        Tuple,
-        Struct,
-        Variant,
-        List,
-        Set,
-        Reference
     }
 
     /// <summary>
@@ -230,7 +292,7 @@ namespace DB
     public sealed class TupleType : Type
     {
         internal TupleType(Type[] ElementTypes)
-            : base(_Name(ElementTypes), Kind.Tuple)
+            : base(Kind.Tuple)
         {
             this.ElementTypes = ElementTypes;
         }
@@ -238,18 +300,24 @@ namespace DB
         /// <summary>
         /// Gets the name for the tuple with the given element types.
         /// </summary>
-        private static string _Name(Type[] ElementTypes)
+        public static string GetName(Type[] ElementTypes)
         {
             StringBuilder str = new StringBuilder();
             str.Append("(");
             if (ElementTypes.Length > 0)
             {
-                str.Append(ElementTypes[0].Name);
+                string name = ElementTypes[0].Name;
+                if (name == null)
+                    return null;
+                str.Append(name);
             }
             for (int t = 1; t < ElementTypes.Length; t++)
             {
                 str.Append(", ");
-                str.Append(ElementTypes[t].Name);
+                string name = ElementTypes[0].Name;
+                if (name == null)
+                    return null;
+                str.Append(name);
             }
             str.Append(")");
             return str.ToString();
@@ -371,6 +439,23 @@ namespace DB
         }
 
         /// <summary>
+        /// Gets the name of a list type with the given element type.
+        /// </summary>
+        public static string GetName(Type ElementType)
+        {
+            string name = ElementType.Name;
+            if (name != null)
+            {
+                StringBuilder sb = new StringBuilder();
+                sb.Append("[");
+                sb.Append(ElementType.Name);
+                sb.Append("]");
+                return sb.ToString();
+            }
+            return null;
+        }
+
+        /// <summary>
         /// The type for elements of this list type.
         /// </summary>
         public readonly Type ElementType;
@@ -383,9 +468,26 @@ namespace DB
     public sealed class SetType : Type
     {
         internal SetType(Type ElementType)
-            : base("{" + ElementType.Name + "}", Kind.Set)
+            : base(GetName(ElementType), Kind.Set)
         {
             this.ElementType = ElementType;
+        }
+
+        /// <summary>
+        /// Gets the name of a set type with the given element type.
+        /// </summary>
+        public static string GetName(Type ElementType)
+        {
+            string name = ElementType.Name;
+            if (name != null)
+            {
+                StringBuilder sb = new StringBuilder();
+                sb.Append("{");
+                sb.Append(ElementType.Name);
+                sb.Append("}");
+                return sb.ToString();
+            }
+            return null;
         }
 
         /// <summary>
@@ -400,14 +502,40 @@ namespace DB
     public sealed class ReferenceType : Type
     {
         internal ReferenceType(Type TargetType)
-            : base(TargetType + "*", Kind.Reference)
+            : base(Kind.Reference)
         {
-            this.TargetType = TargetType;
+            this._TargetType = TargetType;
+        }
+
+        internal ReferenceType()
+            : base(Kind.Reference)
+        {
+
         }
 
         /// <summary>
-        /// The target type of this reference.
+        /// Gets the name of a reference type with the given target type.
         /// </summary>
-        public readonly Type TargetType;
+        public static string GetName(Type TargetType)
+        {
+            string name = TargetType.Name;
+            if (name != null)
+                return name + "*";
+            else
+                return null;
+        }
+
+        /// <summary>
+        /// Gets the target type of this reference.
+        /// </summary>
+        public Type TargetType
+        {
+            get
+            {
+                return this._TargetType;
+            }
+        }
+
+        internal Type _TargetType;
     }
 }
