@@ -9,7 +9,7 @@ namespace DB
     /// </summary>
     public abstract class Handle
     {
-        public Handle(Type Type)
+        internal Handle(Type Type)
         {
             this.Type = Type;
         }
@@ -20,79 +20,18 @@ namespace DB
         public readonly Type Type;
 
         /// <summary>
-        /// Performs an operation on this handle.
-        /// </summary>
-        /// <remarks>The operation should be checked for type compatibility before using this method.</remarks>
-        /// <param name="Argument">The argument of the operation, when applicable.</param>
-        /// <param name="Index">The index of the operation, when applicable.</param>
-        public abstract void Perform(HandleOperation Operation, Handle Argument, int Index);
-
-        /// <summary>
-        /// Performs a query on this handle.
-        /// </summary>
-        /// <remarks>The query should be checked for type compatibility before using this method.</remarks>
-        /// <param name="Index">The index of the operation, when applicable.</param>
-        public abstract object Perform(HandleQuery Query, int Index);
-
-        /// <summary>
-        /// Performs an operation on this handle.
-        /// </summary>
-        public void Perform(HandleOperation Operation, Handle Argument)
-        {
-            this.Perform(Operation, Argument, 0);
-        }
-
-        /// <summary>
-        /// Performs an operation on this handle.
-        /// </summary>
-        public void Perform(HandleOperation Operation, int Index)
-        {
-            this.Perform(Operation, null, Index);
-        }
-
-        /// <summary>
-        /// Performs an operation on this handle.
-        /// </summary>
-        public void Perform(HandleOperation Operation)
-        {
-            this.Perform(Operation, null, 0);
-        }
-
-        /// <summary>
-        /// Performs a query on this handle.
-        /// </summary>
-        public object Perform(HandleQuery Query)
-        {
-            return this.Perform(Query, 0);
-        }
-
-        /// <summary>
         /// Gets or sets a handle to the target object for this handle. For references, this will get or set the handle for the object
         /// the reference points to. For dynamic values, this will get or set a typed version of the object.
         /// </summary>
         /// <remarks>This may only be used for references and dynamic values.</remarks>
-        public Handle Target
+        public virtual Handle Target
         {
             get
             {
-                if (this.Type is ReferenceType)
-                    return (Handle)this.Perform(HandleQuery.GetTargetReference);
-                if (this.Type is DynamicType)
-                    return (Handle)this.Perform(HandleQuery.GetTargetDynamic);
                 throw new TypeIncompatibleException();
             }
             set
             {
-                if (this.Type is ReferenceType)
-                {
-                    this.Perform(HandleOperation.SetTargetReference, value);
-                    return;
-                }
-                if (this.Type is DynamicType)
-                {
-                    this.Perform(HandleOperation.SetTargetDynamic, value);
-                    return;
-                }
                 throw new TypeIncompatibleException();
             }
         }
@@ -101,44 +40,27 @@ namespace DB
         /// Gets the size of this collection.
         /// </summary>
         /// <remarks>This may only be used for lists, sets or tuples.</remarks>
-        public int Size
+        public virtual int Size
         {
             get
             {
-                if (this.Type is ListType)
-                    return (int)this.Perform(HandleQuery.GetListSize);
-                if (this.Type is SetType)
-                    return (int)this.Perform(HandleQuery.GetSetSize);
-                TupleType tt = this.Type as TupleType;
-                if (tt != null)
-                {
-                    return tt.ElementTypes.Length;
-                }
                 throw new TypeIncompatibleException();
             }
         }
 
         /// <summary>
-        /// Gets or sets the index of the current form of this variant. When setting the form, the form's information will be set to the default
-        /// value of the form type.
+        /// Gets or sets the index of the current option of this variant. When setting the option index, the additional information of the option will be
+        /// undefined, and should be set before being read.
         /// </summary>
         /// <remarks>This may only be used for variants.</remarks>
-        public int Option
+        public virtual int Option
         {
             get
             {
-                if (this.Type is VariantType)
-                    return (int)this.Perform(HandleQuery.GetOptionIndex);
                 throw new TypeIncompatibleException();
             }
             set
             {
-                VariantType vt = this.Type as VariantType;
-                if (vt != null)
-                {
-                    this.Perform(HandleOperation.SetOption, vt.Options[value].Type.Default(), value);
-                    return;
-                }
                 throw new TypeIncompatibleException();
             }
         }
@@ -149,42 +71,15 @@ namespace DB
         /// be used to lookup or replace an element at a certain index.
         /// </summary>
         /// <remarks>This may only be used for structs, variants, tuples or lists.</remarks>
-        public Handle this[int Index]
+        public virtual Handle this[int Index]
         {
             get
             {
-                if (this.Type is TupleType)
-                    return (Handle)this.Perform(HandleQuery.GetElementTuple, Index);
-                if (this.Type is ListType)
-                    return (Handle)this.Perform(HandleQuery.GetElementList, Index);
-                if (this.Type is StructType)
-                    return (Handle)this.Perform(HandleQuery.GetField, Index);
-                if (this.Type is VariantType)
-                    return (Handle)this.Perform(HandleQuery.GetOption, Index);
                 throw new TypeIncompatibleException();
             }
             set
             {
-                if (this.Type is TupleType)
-                {
-                    this.Perform(HandleOperation.SetElementTuple, value, Index);
-                    return;
-                }
-                if (this.Type is ListType)
-                {
-                    this.Perform(HandleOperation.SetElementList, value, Index);
-                    return;
-                }
-                if (this.Type is StructType)
-                {
-                    this.Perform(HandleOperation.SetField, value, Index);
-                    return;
-                }
-                if (this.Type is VariantType)
-                {
-                    this.Perform(HandleOperation.SetOption, value, Index);
-                    return;
-                }
+
                 throw new TypeIncompatibleException();
             }
         }
@@ -195,36 +90,14 @@ namespace DB
         /// get the associated data for the given form (which will be null if that is not the current form).
         /// </summary>
         /// <remarks>This may only be used for structs or variants.</remarks>
-        public Handle this[string Name]
+        public virtual Handle this[string Name]
         {
             get
             {
-                StructType st = this.Type as StructType;
-                if (st != null)
-                    return (Handle)this.Perform(HandleQuery.GetField, st.FieldByName[Name]);
-
-                VariantType vt = this.Type as VariantType;
-                if (vt != null)
-                    return (Handle)this.Perform(HandleQuery.GetOption, vt.OptionByName[Name]);
-
                 throw new TypeIncompatibleException();
             }
             set
             {
-                StructType st = this.Type as StructType;
-                if (st != null)
-                {
-                    this.Perform(HandleOperation.SetField, value, st.FieldByName[Name]);
-                    return;
-                }
-
-                VariantType vt = this.Type as VariantType;
-                if (vt != null)
-                {
-                    this.Perform(HandleOperation.SetOption, value, vt.OptionByName[Name]);
-                    return;
-                }
-
                 throw new TypeIncompatibleException();
             }
         }
@@ -232,33 +105,27 @@ namespace DB
         /// <summary>
         /// Replaces the contents of this handle with the object at the given handle.
         /// </summary>
-        public void Set(Handle Object)
+        public virtual void Set(Handle Object)
         {
-            if (this.Type != Object.Type)
-                throw new TypeIncompatibleException();
-            this.Perform(HandleOperation.Replace, Object);
+            throw new TypeIncompatibleException();
         }
 
         /// <summary>
-        /// Replaces the contents of this handle with the given string, or sets the current option for
-        /// this variant.
+        /// Replaces the contents of this handle with the given value.
         /// </summary>
-        /// <remarks>The may only be used for strings and variants.</remarks>
-        public void Set(string String)
+        /// <remarks>The type of the given value should be the native type of this handle.</remarks>
+        public virtual void Set<T>(T Value)
         {
-            if (this.Type == Type.String)
-            {
-                this.Perform(HandleOperation.Replace, String);
-                return;
-            }
+            throw new TypeIncompatibleException();
+        }
 
-            VariantType vt = this.Type as VariantType;
-            if (vt != null)
-            {
-                int optind = vt.OptionByName[String];
-                this.Perform(HandleOperation.SetOption, vt.Options[optind].Type.Default(), optind);
-                return;
-            }
+        /// <summary>
+        /// Gets the object at this handle as a value of the given type. Note that this will create a copy of the object at the time the
+        /// method was called; no further changes can be made to the returned value using this handle.
+        /// </summary>
+        /// <remarks>The given type should be the native type of this handle.</remarks>
+        public virtual T Get<T>()
+        {
             throw new TypeIncompatibleException();
         }
 
@@ -266,20 +133,8 @@ namespace DB
         /// Removes all items in this collection.
         /// </summary>
         /// <remarks>This may only be used for lists or sets.</remarks>
-        public void Clear()
+        public virtual void Clear()
         {
-            if (this.Type is ListType)
-            {
-                this.Perform(HandleOperation.ClearList);
-                return;
-            }
-
-            if (this.Type is SetType)
-            {
-                this.Perform(HandleOperation.ClearSet);
-                return;
-            }
-
             throw new TypeIncompatibleException();
         }
 
@@ -287,14 +142,8 @@ namespace DB
         /// Inserts an object into the given index in the list at this handle.
         /// </summary>
         /// <remarks>This may only be used for lists.</remarks>
-        public void Insert(int Index, Handle Object)
+        public virtual void Insert(int Index, Handle Object)
         {
-            ListType lt = this.Type as ListType;
-            if (lt != null && lt.ElementType == Object.Type)
-            {
-                this.Perform(HandleOperation.InsertList, Object, Index);
-                return;
-            }
             throw new TypeIncompatibleException();
         }
 
@@ -302,14 +151,8 @@ namespace DB
         /// Inserts an object to the set at this handle.
         /// </summary>
         /// <remarks>This may only be used for sets.</remarks>
-        public void Insert(Handle Object)
+        public virtual void Insert(Handle Object)
         {
-            SetType st = this.Type as SetType;
-            if (st != null && st.ElementType == Object.Type)
-            {
-                this.Perform(HandleOperation.InsertSet, Object);
-                return;
-            }
             throw new TypeIncompatibleException();
         }
 
@@ -317,13 +160,8 @@ namespace DB
         /// Removes the object at the given index in the list at this handle.
         /// </summary>
         /// <remarks>This may only be used for lists.</remarks>
-        public void Remove(int Index)
+        public virtual void Remove(int Index)
         {
-            if (this.Type is ListType)
-            {
-                this.Perform(HandleOperation.RemoveList, Index);
-                return;
-            }
             throw new TypeIncompatibleException();
         }
 
@@ -331,29 +169,17 @@ namespace DB
         /// Removes an object from the set at this handle.
         /// </summary>
         /// <remarks>This may only be used for sets.</remarks>
-        public void Remove(Handle Object)
+        public virtual void Remove(Handle Object)
         {
-            SetType st = this.Type as SetType;
-            if (st != null && st.ElementType == Object.Type)
-            {
-                this.Perform(HandleOperation.RemoveSet, Object);
-                return;
-            }
             throw new TypeIncompatibleException();
         }
-
 
         /// <summary>
         /// Appends an object to the list at this handle.
         /// </summary>
         /// <remarks>This may only be used for lists.</remarks>
-        public void Append(Handle Object)
+        public virtual void Append(Handle Object)
         {
-            if (this.Type is ListType)
-            {
-                this.Perform(HandleOperation.Append, Object);
-                return;
-            }
             throw new TypeIncompatibleException();
         }
 
@@ -361,170 +187,139 @@ namespace DB
         /// Prepends an object to the list at this handle.
         /// </summary>
         /// <remarks>This may only be used for lists.</remarks>
-        public void Prepend(Handle Object)
+        public virtual void Prepend(Handle Object)
         {
-            if (this.Type is ListType)
-            {
-                this.Perform(HandleOperation.Prepend, Object);
-                return;
-            }
             throw new TypeIncompatibleException();
         }
 
         public static implicit operator Handle(bool Value)
         {
-            throw new NotImplementedException();
+            return Type.Bool.Construct(Value);
         }
 
         public static implicit operator Handle(string Value)
         {
-            throw new NotImplementedException();
+            return Type.String.Construct(Value);
         }
 
         public static implicit operator Handle(byte Value)
         {
-            throw new NotImplementedException();
+            return Type.Byte.Construct(Value);
         }
 
         public static implicit operator Handle(char Value)
         {
-            throw new NotImplementedException();
+            return Type.Char.Construct(Value);
         }
 
         public static implicit operator Handle(short Value)
         {
-            throw new NotImplementedException();
+            return Type.Short.Construct(Value);
         }
 
         public static implicit operator Handle(ushort Value)
         {
-            throw new NotImplementedException();
+            return Type.UShort.Construct(Value);
         }
 
         public static implicit operator Handle(int Value)
         {
-            throw new NotImplementedException();
+            return Type.Int.Construct(Value);
         }
 
         public static implicit operator Handle(uint Value)
         {
-            throw new NotImplementedException();
+            return Type.UInt.Construct(Value);
         }
 
         public static implicit operator Handle(long Value)
         {
-            throw new NotImplementedException();
+            return Type.Long.Construct(Value);
         }
 
         public static implicit operator Handle(ulong Value)
         {
-            throw new NotImplementedException();
+            return Type.ULong.Construct(Value);
         }
 
         public static implicit operator Handle(float Value)
         {
-            throw new NotImplementedException();
+            return Type.Float.Construct(Value);
         }
 
         public static implicit operator Handle(double Value)
         {
-            throw new NotImplementedException();
+            return Type.Double.Construct(Value);
         }
 
         public static implicit operator Handle(decimal Value)
         {
-            throw new NotImplementedException();
+            return Type.Decimal.Construct(Value);
         }
 
         public static implicit operator byte(Handle Handle)
         {
-            if (Handle.Type != Type.Byte)
-                throw new TypeIncompatibleException();
-            return (byte)Handle.Perform(HandleQuery.GetPrimitiveByte, 0);
+            return Handle.Get<byte>();
         }
 
         public static implicit operator char(Handle Handle)
         {
-            if (Handle.Type != Type.Char)
-                throw new TypeIncompatibleException();
-            return (char)Handle.Perform(HandleQuery.GetPrimitiveChar, 0);
+            return Handle.Get<char>();
         }
 
         public static implicit operator short(Handle Handle)
         {
-            if (Handle.Type != Type.Short)
-                throw new TypeIncompatibleException();
-            return (short)Handle.Perform(HandleQuery.GetPrimitiveShort, 0);
+            return Handle.Get<short>();
         }
 
         public static implicit operator ushort(Handle Handle)
         {
-            if (Handle.Type != Type.UShort)
-                throw new TypeIncompatibleException();
-            return (ushort)(short)Handle.Perform(HandleQuery.GetPrimitiveShort, 0);
+            return Handle.Get<ushort>();
         }
 
         public static implicit operator int(Handle Handle)
         {
-            if (Handle.Type != Type.Int)
-                throw new TypeIncompatibleException();
-            return (int)Handle.Perform(HandleQuery.GetPrimitiveInt, 0);
+            return Handle.Get<int>();
         }
 
         public static implicit operator uint(Handle Handle)
         {
-            if (Handle.Type != Type.UInt)
-                throw new TypeIncompatibleException();
-            return (uint)(int)Handle.Perform(HandleQuery.GetPrimitiveInt, 0);
+            return Handle.Get<uint>();
         }
 
         public static implicit operator long(Handle Handle)
         {
-            if (Handle.Type != Type.Long)
-                throw new TypeIncompatibleException();
-            return (long)Handle.Perform(HandleQuery.GetPrimitiveLong, 0);
+            return Handle.Get<long>();
         }
 
         public static implicit operator ulong(Handle Handle)
         {
-            if (Handle.Type != Type.ULong)
-                throw new TypeIncompatibleException();
-            return (ulong)(long)Handle.Perform(HandleQuery.GetPrimitiveLong, 0);
+            return Handle.Get<ulong>();
         }
 
         public static implicit operator float(Handle Handle)
         {
-            if (Handle.Type != Type.Float)
-                throw new TypeIncompatibleException();
-            return (float)Handle.Perform(HandleQuery.GetPrimitiveFloat, 0);
+            return Handle.Get<float>();
         }
 
         public static implicit operator double(Handle Handle)
         {
-            if (Handle.Type != Type.Double)
-                throw new TypeIncompatibleException();
-            return (double)Handle.Perform(HandleQuery.GetPrimitiveDouble, 0);
+            return Handle.Get<double>();
         }
 
         public static implicit operator decimal(Handle Handle)
         {
-            if (Handle.Type != Type.Decimal)
-                throw new TypeIncompatibleException();
-            return (decimal)Handle.Perform(HandleQuery.GetPrimitiveDecimal, 0);
+            return Handle.Get<decimal>();
         }
 
         public static implicit operator bool(Handle Handle)
         {
-            if (Handle.Type != Type.Bool)
-                throw new TypeIncompatibleException();
-            throw new NotImplementedException();
+            return Handle.Get<bool>();
         }
 
         public static implicit operator string(Handle Handle)
         {
-            if (Handle.Type != Type.String)
-                throw new TypeIncompatibleException();
-            throw new NotImplementedException();
+            return Handle.Get<string>();
         }
     }
 
@@ -535,51 +330,5 @@ namespace DB
     public class TypeIncompatibleException : Exception
     {
 
-    }
-
-    /// <summary>
-    /// Identifies a possible operation to be performed on a handle.
-    /// </summary>
-    public enum HandleOperation
-    {
-        SetTargetReference,
-        SetTargetDynamic,
-        SetOption,
-        SetField,
-        SetElementTuple,
-        SetElementList,
-        Replace,
-        ClearList,
-        ClearSet,
-        InsertList,
-        InsertSet,
-        RemoveList,
-        RemoveSet,
-        Append,
-        Prepend
-    }
-
-    /// <summary>
-    /// Identifies a possible query to be performed on a handle.
-    /// </summary>
-    public enum HandleQuery
-    {
-        GetTargetReference,
-        GetTargetDynamic,
-        GetListSize,
-        GetSetSize,
-        GetOptionIndex,
-        GetOption,
-        GetField,
-        GetElementTuple,
-        GetElementList,
-        GetPrimitiveByte,
-        GetPrimitiveChar,
-        GetPrimitiveShort,
-        GetPrimitiveInt,
-        GetPrimitiveLong,
-        GetPrimitiveFloat,
-        GetPrimitiveDouble,
-        GetPrimitiveDecimal
     }
 }

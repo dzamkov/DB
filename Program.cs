@@ -14,35 +14,15 @@ namespace DB
         /// </summary>
         public static void Main(string[] Args)
         {
-            Type mytype = Type.Struct("Stuff", new Field[]
+            Type teststruct = Type.Struct("TestStruct", new Field[]
             {
-                new Field("Frequency", Type.Int),
-                new Field("Gender", Type.Variant("Gender", new Option[]
-                {
-                    new Option("Male", Type.Void),
-                    new Option("Female", Type.Void),
-                    new Option("Undecided", Type.Void),
-                })),
-                new Field("Name", Type.String),
-                new Field("Owner", Type.Int.Reference),
-                new Field("Friends", Type.String.Set),
-                new Field("Log", Type.String.List),
-                new Field("IsHappy", Type.Bool)
+                new Field("A", Type.Int),
+                new Field("B", Type.Int),
+                new Field("C", Type.Int),
+                new Field("D", Type.Int)
             });
 
-            Handle a = mytype.Default();
-            a["Frequency"] = 4;
-            a["Gender"].Set("Male");
-            a["Name"] = "Something";
-            a["Owner"].Target = 4;
-
-            a["Friends"].Clear();
-            a["Friends"].Insert("Some Guy");
-
-            a["Log"].Clear();
-            a["Log"].Append("Cause blah blah");
-
-            a["IsHappy"] = true;
+            Handle testvalue = teststruct.Construct();
         }
     }
 }

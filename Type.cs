@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
+using NativeType = System.Type;
+
 namespace DB
 {
     /// <summary>
@@ -26,12 +28,6 @@ namespace DB
     /// </summary>
     public abstract class Type
     {
-        internal Type(string Name, Kind Kind)
-        {
-            this._Name = Name;
-            this._Kind = Kind;
-        }
-
         internal Type(Kind Kind)
         {
             this._Kind = Kind;
@@ -78,64 +74,76 @@ namespace DB
         }
 
         /// <summary>
+        /// Gets the native type that objects of this type can be converted from and to. If this is null, the only way access or modify objects
+        /// of this type is through handles.
+        /// </summary>
+        public NativeType NativeType
+        {
+            get
+            {
+                return this._NativeType;
+            }
+        }
+
+        /// <summary>
         /// A primitive type with only one value, and no data.
         /// </summary>
-        public static readonly PrimitiveType Void = new PrimitiveType("void", 0, false);
+        public static readonly PrimitiveType Void = new PrimitiveType(typeof(void), "void", 0, false);
 
         /// <summary>
         /// The primitive type for an unsigned byte of data.
         /// </summary>
-        public static readonly PrimitiveType Byte = new PrimitiveType("byte", 1, false);
+        public static readonly PrimitiveType Byte = new PrimitiveType<byte>("byte", 1, false);
 
         /// <summary>
         /// The primitive type for a character.
         /// </summary>
-        public static readonly PrimitiveType Char = new PrimitiveType("char", 2, false);
+        public static readonly PrimitiveType Char = new PrimitiveType<char>("char", 2, false);
 
         /// <summary>
         /// The primitive type for a signed 2-byte integer.
         /// </summary>
-        public static readonly PrimitiveType Short = new PrimitiveType("short", 2, true);
+        public static readonly PrimitiveType Short = new PrimitiveType<short>("short", 2, true);
 
         /// <summary>
         /// The primitive type for an unsigned 2-byte integer.
         /// </summary>
-        public static readonly PrimitiveType UShort = new PrimitiveType("ushort", 2, false);
+        public static readonly PrimitiveType UShort = new PrimitiveType<ushort>("ushort", 2, false);
 
         /// <summary>
         /// The primitive type for a signed 4-byte integer.
         /// </summary>
-        public static readonly PrimitiveType Int = new PrimitiveType("int", 4, true);
+        public static readonly PrimitiveType Int = new PrimitiveType<int>("int", 4, true);
 
         /// <summary>
         /// The primitive type for a unsigned 4-byte integer.
         /// </summary>
-        public static readonly PrimitiveType UInt = new PrimitiveType("uint", 4, false);
+        public static readonly PrimitiveType UInt = new PrimitiveType<uint>("uint", 4, false);
 
         /// <summary>
         /// The primitive type for a signed 8-byte integer.
         /// </summary>
-        public static readonly PrimitiveType Long = new PrimitiveType("long", 8, true);
+        public static readonly PrimitiveType Long = new PrimitiveType<long>("long", 8, true);
 
         /// <summary>
         /// The primitive type for an unsigned 8-byte integer.
         /// </summary>
-        public static readonly PrimitiveType ULong = new PrimitiveType("ulong", 8, false);
+        public static readonly PrimitiveType ULong = new PrimitiveType<ulong>("ulong", 8, false);
 
         /// <summary>
         /// The primitive type for a single-precision floating point number.
         /// </summary>
-        public static readonly PrimitiveType Float = new PrimitiveType("float", 4, true);
+        public static readonly PrimitiveType Float = new PrimitiveType<float>("float", 4, true);
 
         /// <summary>
         /// The primitive type for a double-precision floating point number.
         /// </summary>
-        public static readonly PrimitiveType Double = new PrimitiveType("double", 8, true);
+        public static readonly PrimitiveType Double = new PrimitiveType<double>("double", 8, true);
 
         /// <summary>
         /// The primitive type for a decimal number.
         /// </summary>
-        public static readonly PrimitiveType Decimal = new PrimitiveType("decimal", 16, true);
+        public static readonly PrimitiveType Decimal = new PrimitiveType<decimal>("decimal", 16, true);
 
         /// <summary>
         /// The type for a string of character.
@@ -175,6 +183,14 @@ namespace DB
         public static StructType Struct(string Name, Field[] Fields)
         {
             return new StructType(Name, Fields);
+        }
+
+        /// <summary>
+        /// Constructs a struct type from a native type.
+        /// </summary>
+        public static StructType Struct(NativeType Type)
+        {
+            return new StructType(Type);
         }
 
         /// <summary>
@@ -237,14 +253,25 @@ namespace DB
         }
 
         /// <summary>
-        /// Creates a handle to the default value of this type.
+        /// Constructs a handle for an object of this type with an undefined value. The object will be stored in memory and
+        /// and will not be associated with any particular database.
         /// </summary>
-        public virtual Handle Default()
+        public abstract Handle Construct();
+
+        /// <summary>
+        /// Constructs a handle for an object of this type with the given initial value. The object will be stored in memory and
+        /// and will not be associated with any particular database.
+        /// </summary>
+        /// <remarks>The given value should be of the native type of this type.</remarks>
+        public Handle Construct<T>(T Value)
         {
-            return null;
+            Handle h = this.Construct();
+            h.Set<T>(Value);
+            return h;
         }
 
-        private string _Name;
+        internal NativeType _NativeType;
+        internal string _Name;
         private Kind _Kind;
         private ListType _List;
         private SetType _Set;
@@ -254,11 +281,14 @@ namespace DB
     /// <summary>
     /// A type for a simple numerical value.
     /// </summary>
-    public sealed class PrimitiveType : Type
+    public class PrimitiveType : Type
     {
-        internal PrimitiveType(string Name, int Size, bool Signed)
-            : base(Name, Kind.Primitive)
+        internal PrimitiveType(NativeType NativeType, string Name, int Size, bool Signed)
+            : base(Kind.Primitive)
         {
+            this._Name = Name;
+            this._NativeType = NativeType;
+
             this.Signed = Signed;
             this.Size = Size;
         }
@@ -272,6 +302,28 @@ namespace DB
         /// Indicates wether this primitive type allows for negative values.
         /// </summary>
         public readonly bool Signed;
+
+        public override Handle Construct()
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    /// <summary>
+    /// A generic primitive type.
+    /// </summary>
+    internal sealed class PrimitiveType<T> : PrimitiveType
+    {
+        internal PrimitiveType(string Name, int Size, bool Signed)
+            : base(typeof(T), Name, Size, Signed)
+        {
+
+        }
+
+        public override Handle Construct()
+        {
+            throw new NotImplementedException();
+        }
     }
 
     /// <summary>
@@ -280,9 +332,15 @@ namespace DB
     public sealed class DynamicType : Type
     {
         internal DynamicType()
-            : base("dynamic", Kind.Dynamic)
+            : base(Kind.Dynamic)
         {
+            this._Name = "dynamic";
+            this._NativeType = typeof(Handle);
+        }
 
+        public override Handle Construct()
+        {
+            throw new NotImplementedException();
         }
     }
 
@@ -327,6 +385,11 @@ namespace DB
         /// The types for the elements of the tuple.
         /// </summary>
         public readonly Type[] ElementTypes;
+
+        public override Handle Construct()
+        {
+            throw new NotImplementedException();
+        }
     }
 
     /// <summary>
@@ -335,8 +398,10 @@ namespace DB
     public sealed class StructType : Type
     {
         internal StructType(string Name, Field[] Fields)
-            : base(Name, Kind.Struct)
+            : base(Kind.Struct)
         {
+            this._Name = Name;
+
             this.Fields = Fields;
             this.FieldByName = new Dictionary<string, int>();
             for (int t = 0; t < this.Fields.Length; t++)
@@ -345,6 +410,15 @@ namespace DB
             }
         }
 
+        internal StructType(NativeType Type)
+            : base(Kind.Struct)
+        {
+            this._Name = Type.Name;
+            this._NativeType = Type;
+
+            throw new NotImplementedException();
+        }
+        
         /// <summary>
         /// The fields for this struct type.
         /// </summary>
@@ -354,6 +428,12 @@ namespace DB
         /// A mapping of names to fields.
         /// </summary>
         public readonly Dictionary<string, int> FieldByName;
+
+        public override Handle Construct()
+        {
+            throw new NotImplementedException();
+        }
+
     }
 
     /// <summary>
@@ -384,8 +464,10 @@ namespace DB
     public sealed class VariantType : Type
     {
         internal VariantType(string Name, Option[] Options)
-            : base(Name, Kind.Variant)
+            : base(Kind.Variant)
         {
+            this._Name = Name;
+
             this.Options = Options;
             this.OptionByName = new Dictionary<string, int>();
             for (int t = 0; t < this.Options.Length; t++)
@@ -403,6 +485,11 @@ namespace DB
         /// A mapping of names to options.
         /// </summary>
         public readonly Dictionary<string, int> OptionByName;
+
+        public override Handle Construct()
+        {
+            throw new NotImplementedException();
+        }
     }
 
     /// <summary>
@@ -430,10 +517,10 @@ namespace DB
     /// <summary>
     /// A type for a variable-size ordered collection of homogeneously-typed elements.
     /// </summary>
-    public sealed class ListType : Type
+    public class ListType : Type
     {
         internal ListType(Type ElementType)
-            : base("[" + ElementType.Name + "]", Kind.List)
+            : base(Kind.List)
         {
             this.ElementType = ElementType;
         }
@@ -459,6 +546,11 @@ namespace DB
         /// The type for elements of this list type.
         /// </summary>
         public readonly Type ElementType;
+
+        public override Handle Construct()
+        {
+            throw new NotImplementedException();
+        }
     }
 
     /// <summary>
@@ -468,7 +560,7 @@ namespace DB
     public sealed class SetType : Type
     {
         internal SetType(Type ElementType)
-            : base(GetName(ElementType), Kind.Set)
+            : base(Kind.Set)
         {
             this.ElementType = ElementType;
         }
@@ -494,6 +586,11 @@ namespace DB
         /// The type for elements of this set type.
         /// </summary>
         public readonly Type ElementType;
+
+        public override Handle Construct()
+        {
+            throw new NotImplementedException();
+        }
     }
 
     /// <summary>
@@ -504,13 +601,14 @@ namespace DB
         internal ReferenceType(Type TargetType)
             : base(Kind.Reference)
         {
+            this._NativeType = typeof(Handle);
             this._TargetType = TargetType;
         }
 
         internal ReferenceType()
             : base(Kind.Reference)
         {
-
+            this._NativeType = typeof(Handle);
         }
 
         /// <summary>
@@ -534,6 +632,11 @@ namespace DB
             {
                 return this._TargetType;
             }
+        }
+
+        public override Handle Construct()
+        {
+            throw new NotImplementedException();
         }
 
         internal Type _TargetType;
